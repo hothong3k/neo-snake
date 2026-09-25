@@ -21,16 +21,19 @@ The faithful recreation of the original Snake experience.
 
 Builds upon Classic Mode with creative twists.
 
-- **Obstacles** are placed throughout the play area — colliding with any obstacle ends the game.
+- When the snake hits a **wall** (boundary), it **stops moving** instead of dying. The player must change direction to resume movement.
+- **Obstacles** are **randomly generated** throughout the play area. Every **15 seconds**, obstacles relocate to new random positions.
 - **Power-ups** spawn periodically, offering temporary effects such as:
   - ⚡ **Speed Boost** — temporarily increases snake speed.
   - 🛡️ **Shield** — grants temporary invincibility against obstacles.
   - ✂️ **Shrink** — reduces the snake's length.
 - **Game Over** conditions:
   - The snake collides with **itself**.
-  - The snake collides with an **obstacle**.
+  - The snake collides with an **obstacle** (unless protected by a Shield).
 
 ## 🕹️ How to Play
+
+The snake **cannot reverse direction** — it can only turn left, right, or continue forward relative to its current heading.
 
 | Action | Keyboard Option 1 | Keyboard Option 2 |
 |---|---|---|

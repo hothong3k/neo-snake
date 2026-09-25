@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Neo Snake — Classic Mode</title>
+  <meta name="description" content="Neo Snake: A modern take on the classic Snake game. Classic Mode features wall collisions, progressive speed, and persistent high scores.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- ── In-game HUD (outside canvas, above the grid) ────── -->
+    <div id="hud" class="hud hidden" aria-live="polite" aria-label="Game HUD">
+      <span id="hud-score" class="hud-score">Score&ensp;<strong>0</strong></span>
+      <span id="hud-mode"  class="hud-mode">CLASSIC</span>
+      <span id="hud-best"  class="hud-best">Best&ensp;<strong>0</strong></span>
+    </div>
+
+    <!-- Canvas wrapper -->
+    <div id="game-wrapper">
+      <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <!-- ── Menu Screen ─────────────────────────────────────── -->
+    <div id="screen-menu" class="screen active" role="dialog" aria-label="Main Menu">
+      <div class="card">
+        <div class="logo">
+          <span class="logo-neo">Neo</span><span class="logo-snake">Snake</span>
+        </div>
+        <p class="mode-badge">Classic Mode</p>
+
+        <div class="controls-guide" aria-label="Controls">
+          <div class="control-row">
+            <div class="key-group">
+              <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>
+            </div>
+            <span class="or-divider">or</span>
+            <div class="key-group">
+              <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd>
+            </div>
+            <span class="ctrl-label">Move</span>
+          </div>
+          <div class="control-row">
+            <div class="key-group">
+              <kbd>P</kbd>
+              <span class="key-sep">/</span>
+              <kbd>Esc</kbd>
+            </div>
+            <span class="ctrl-label">Pause</span>
+          </div>
+        </div>
+
+        <div class="menu-hs">
+          High Score: <strong id="menu-hs-value">0</strong>
+        </div>
+
+        <button id="btn-start" class="btn-primary">
+          ▶&ensp;Start &mdash; Press <kbd class="kbd-inline">Space</kbd>
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Pause Screen ────────────────────────────────────── -->
+    <div id="screen-pause" class="screen" role="dialog" aria-label="Paused">
+      <div class="card card--sm">
+        <h2 class="title-pause">PAUSED</h2>
+        <p class="subtitle">Press <kbd>P</kbd> or <kbd>Esc</kbd> to resume</p>
+        <div class="pause-actions">
+          <button id="btn-resume" class="btn-primary">▶&ensp;Resume</button>
+          <button id="btn-pause-menu" class="btn-secondary">Back to Menu</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Game Over Screen ────────────────────────────────── -->
+    <div id="screen-game-over" class="screen" role="dialog" aria-label="Game Over">
+      <div class="card">
+        <h2 class="title-gameover">GAME OVER</h2>
+
+        <div id="new-record-badge" class="new-record hidden" aria-live="polite">
+          🏆&ensp;New Record!
+        </div>
+
+        <div class="score-table">
+          <div class="score-row">
+            <span>Score</span>
+            <strong id="go-score">0</strong>
+          </div>
+          <div class="score-row score-row--best">
+            <span>Best</span>
+            <strong id="go-high-score">0</strong>
+          </div>
+        </div>
+
+        <div class="go-actions">
+          <button id="btn-retry"  class="btn-primary">▶&ensp;Retry &mdash; Space</button>
+          <button id="btn-menu" class="btn-secondary">Back to Menu</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- #app -->
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
