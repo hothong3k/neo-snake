@@ -1,15 +1,17 @@
 /**
  * src/renderer.js
  * ─────────────────────────────────────────────────────────────
- * Canvas rendering pipeline for Neo Snake — Classic Mode.
+ * Canvas rendering pipeline for Neo Snake — Classic & Modern Mode.
  *
  * Render order (back → front):
  *   1. Dark background
  *   2. Subtle grid lines
- *   3. Food (pulsing glow circle)
- *   4. Snake body (segments with gradient fade tail→head)
- *   5. Snake head (bright neon + glow)
- *   6. Snake eyes (directional indicator)
+ *   3. Obstacles (Modern only)
+ *   4. Food (pulsing glow circle)
+ *   5. Snake body (segments with gradient fade tail→head)
+ *   6. Snake head (bright neon + glow)
+ *   7. Snake eyes (directional indicator)
+ *   8. Wall-stop flash overlay (Modern only)
  *
  * NOTE: HUD (score, best, mode) is rendered in HTML above the canvas.
  *       See #hud in index.html. drawHUD() has been removed from this file.
@@ -17,7 +19,10 @@
  */
 
 import { state } from './state.js';
-import { GRID_COLS, GRID_ROWS, CELL_SIZE } from './config.js';
+import {
+  GRID_COLS, GRID_ROWS, CELL_SIZE,
+  OBSTACLE_RELOCATE_INTERVAL, OBSTACLE_WARN_BEFORE_MS,
+} from './config.js';
 
 /** Cached canvas and context, set by initRenderer(). */
 let canvas = null;
@@ -122,10 +127,14 @@ function drawFood(now) {
 /**
  * Draw snake body segments from tail toward head.
  * Segments fade from dim green (tail) to bright green (near head).
+ * In Modern Mode, uses CSS variable --snake-color (cyan) via body class.
  */
 function drawSnakeBody() {
   const n = state.snake.length;
   if (n < 2) return;
+
+  // Pick color based on mode
+  const isModern = state.gameMode === 'MODERN';
 
   for (let i = n - 1; i >= 1; i--) {
     const seg = state.snake[i];
@@ -134,7 +143,9 @@ function drawSnakeBody() {
     const alpha = 0.25 + 0.55 * t;
     const r     = 3 + Math.round(2 * t); // rounder near head
 
-    ctx.fillStyle = `rgba(57, 255, 20, ${alpha.toFixed(2)})`;
+    ctx.fillStyle = isModern
+      ? `rgba(0, 229, 255, ${alpha.toFixed(2)})`
+      : `rgba(57, 255, 20, ${alpha.toFixed(2)})`;
     fillRoundRect(
       seg.x * CELL_SIZE + 2,
       seg.y * CELL_SIZE + 2,
@@ -150,10 +161,13 @@ function drawSnakeHead() {
   if (state.snake.length === 0) return;
   const head = state.snake[0];
 
+  const isModern = state.gameMode === 'MODERN';
+  const headColor = isModern ? '#00e5ff' : '#39ff14';
+
   ctx.save();
-  ctx.shadowColor = '#39ff14';
+  ctx.shadowColor = headColor;
   ctx.shadowBlur  = 18;
-  ctx.fillStyle   = '#39ff14';
+  ctx.fillStyle   = headColor;
   fillRoundRect(
     head.x * CELL_SIZE + 1,
     head.y * CELL_SIZE + 1,
@@ -191,6 +205,51 @@ function drawSnakeEyes(head) {
   ctx.beginPath(); ctx.arc(e2.x, e2.y, eyeR, 0, Math.PI * 2); ctx.fill();
 }
 
+// ─── Modern Mode — Obstacles ──────────────────────────────────
+
+/**
+ * Draw obstacles as red-orange blocks with glow.
+ * Warning blink (sin-wave alpha) in the last 3 seconds before relocation.
+ * @param {number} now - performance.now()
+ */
+function drawObstacles(now) {
+  if (!state.obstacles.length) return;
+
+  // Cảnh báo nhấp nháy khi sắp tái sinh (3 giây cuối)
+  const timeUntilReloc = OBSTACLE_RELOCATE_INTERVAL - state.obstacleTimer;
+  const isWarning = timeUntilReloc <= OBSTACLE_WARN_BEFORE_MS;
+  const warnAlpha = isWarning
+    ? 0.4 + 0.6 * Math.abs(Math.sin(now / 200))
+    : 1;
+
+  state.obstacles.forEach(obs => {
+    ctx.save();
+    ctx.globalAlpha = warnAlpha;
+    ctx.shadowColor = '#ff6b35';
+    ctx.shadowBlur  = 8;
+    ctx.fillStyle   = '#cc3300';
+    fillRoundRect(obs.x * CELL_SIZE + 2, obs.y * CELL_SIZE + 2, CELL_SIZE - 4, CELL_SIZE - 4, 3);
+    // Highlight
+    ctx.shadowBlur = 0;
+    ctx.fillStyle  = 'rgba(255,120,60,0.5)';
+    fillRoundRect(obs.x * CELL_SIZE + 3, obs.y * CELL_SIZE + 3, (CELL_SIZE-6)*0.4, (CELL_SIZE-6)*0.4, 2);
+    ctx.restore();
+  });
+}
+
+/**
+ * Draw a full-canvas orange flash for 1 frame when the snake
+ * hits a wall in Modern Mode (visual feedback for wall-stop).
+ */
+function drawWallStopFlash() {
+  if (!state.wallStopFlash) return;
+  ctx.save();
+  ctx.fillStyle = 'rgba(255, 80, 0, 0.12)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.restore();
+  state.wallStopFlash = false; // Reset sau 1 frame
+}
+
 
 // ─── Public API ───────────────────────────────────────────────
 
@@ -214,7 +273,9 @@ export function render(now) {
 
   // Game objects (PLAYING, PAUSED, GAME_OVER all show the last game frame)
   drawGrid();
+  if (state.gameMode === 'MODERN') drawObstacles(now);
   drawFood(now);
   drawSnakeBody();
   drawSnakeHead();
+  if (state.gameMode === 'MODERN') drawWallStopFlash();
 }

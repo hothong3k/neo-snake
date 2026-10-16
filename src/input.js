@@ -45,6 +45,20 @@ const OPPOSITES = {
 };
 
 /**
+ * Kiểm tra hướng có hợp lệ để thoát khỏi tường không.
+ * Loại bỏ: tiếp tục vào tường, hoặc đảo ngược vào thân.
+ */
+function isValidEscapeDirection(dir) {
+  const wallDirection = {
+    LEFT: 'LEFT', RIGHT: 'RIGHT', UP: 'UP', BOTTOM: 'DOWN',
+  }[state.stoppedAtWall];
+
+  if (dir === wallDirection) return false;             // tiếp tục vào tường
+  if (dir === OPPOSITES[state.currentDirection]) return false; // đảo ngược
+  return true;
+}
+
+/**
  * Process a single key event.
  * Routes based on current gameState and applies direction buffering.
  *
@@ -72,6 +86,18 @@ export function handleInput(key) {
       // Pause
       if (key === 'Escape' || key === 'p' || key === 'P') {
         pauseGame();
+        return;
+      }
+
+      // Modern Mode: rắn đang dừng tại tường
+      if (state.gameMode === 'MODERN' && state.isStopped) {
+        const direction = KEY_TO_DIRECTION[key];
+        if (direction && isValidEscapeDirection(direction)) {
+          state.isStopped     = false;
+          state.stoppedAtWall = null;
+          state.nextDirection = direction;
+        }
+        // Hướng không hợp lệ: bỏ qua im lặng
         return;
       }
 

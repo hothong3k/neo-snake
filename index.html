@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Neo Snake — Classic Mode</title>
-  <meta name="description" content="Neo Snake: A modern take on the classic Snake game. Classic Mode features wall collisions, progressive speed, and persistent high scores.">
+  <title>Neo Snake — Classic &amp; Modern Mode</title>
+  <meta name="description" content="Neo Snake: Chọn Classic để thử thách tốc độ thuần túy, hoặc Modern với chướng ngại vật di chuyển. High score được lưu riêng cho từng chế độ.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
@@ -31,7 +31,28 @@
         <div class="logo">
           <span class="logo-neo">Neo</span><span class="logo-snake">Snake</span>
         </div>
-        <p class="mode-badge">Classic Mode</p>
+        <!-- Mode Selection -->
+        <div class="mode-selector" role="group" aria-label="Game Mode">
+          <label class="mode-card mode-card--classic selected" id="label-classic" for="mode-classic">
+            <input type="radio" id="mode-classic" name="game-mode" value="classic" checked>
+            <span class="mode-card__icon">🐍</span>
+            <span class="mode-card__name">Classic</span>
+            <span class="mode-card__desc">
+              Chạm tường là thua. Tốc độ tăng dần theo điểm số.
+              Dành cho người muốn thử thách phản xạ thuần túy.
+            </span>
+          </label>
+
+          <label class="mode-card mode-card--modern" id="label-modern" for="mode-modern">
+            <input type="radio" id="mode-modern" name="game-mode" value="modern">
+            <span class="mode-card__icon">⚡</span>
+            <span class="mode-card__name">Modern</span>
+            <span class="mode-card__desc">
+              Chạm tường → rắn dừng, đổi hướng để tiếp tục.
+              Chướng ngại vật di chuyển và chiến thuật phức tạp hơn.
+            </span>
+          </label>
+        </div>
 
         <div class="controls-guide" aria-label="Controls">
           <div class="control-row">

@@ -60,4 +60,33 @@ export const state = {
    * When >= tickInterval, one tick fires.
    */
   accumulator: 0,
+
+  // ── Mode Selection ────────────────────────────────────────────
+  /** 'CLASSIC' | 'MODERN' — chọn từ menu, không thay đổi trong game. */
+  gameMode: 'CLASSIC',
+
+  // ── Modern Mode — Wall Stop ───────────────────────────────────
+  /**
+   * true khi rắn đang bị chặn tại tường (Modern Mode only).
+   * Game loop bỏ qua bước di chuyển khi isStopped === true.
+   * Ref: game-algorithms-research.md § 4.3
+   */
+  isStopped: false,
+
+  /**
+   * Tường mà rắn đang chạm vào.
+   * 'LEFT' | 'RIGHT' | 'UP' | 'BOTTOM' | null
+   */
+  stoppedAtWall: null,
+
+  // ── Modern Mode — Wall Flash ──────────────────────────────────
+  /** true để renderer vẽ flash overlay 1 frame rồi tự reset. */
+  wallStopFlash: false,
+
+  // ── Modern Mode — Obstacles ───────────────────────────────────
+  /** Mảng {x, y} các ô chướng ngại vật. */
+  obstacles: [],
+
+  /** Bộ đếm thời gian tái sinh obstacle (ms). */
+  obstacleTimer: 0,
 };

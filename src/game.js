@@ -1,9 +1,9 @@
 /**
  * src/game.js
  * ─────────────────────────────────────────────────────────────
- * Core game logic for Classic Mode:
+ * Core game logic for Classic & Modern Mode:
  *   - Game state machine (MENU / PLAYING / PAUSED / GAME_OVER)
- *   - update() — one game tick
+ *   - update() — one game tick (branching Classic / Modern)
  *   - updateSpeed() — logarithmic difficulty curve
  *   - DOM screen management and UI updates
  *   - Button event bindings
@@ -15,11 +15,11 @@ import { state } from './state.js';
 import {
   GRID_COLS, GRID_ROWS,
   BASE_TICK_INTERVAL, MIN_TICK_INTERVAL,
-  POINTS_PER_FOOD,
+  POINTS_PER_FOOD, HIGH_SCORE_KEY_MODERN, HIGH_SCORE_KEY,
 } from './config.js';
 import { initSnake, computeNewHead, moveSnake } from './snake.js';
-import { spawnFood } from './spawner.js';
-import { checkWallCollision, checkSelfCollision, checkFoodCollision } from './collision.js';
+import { spawnFood, spawnObstacles, updateObstacles } from './spawner.js';
+import { checkWallCollision, checkSelfCollision, checkFoodCollision, handleModernWallCollision, checkObstacleCollision } from './collision.js';
 import { loadHighScore, saveHighScore } from './storage.js';
 
 // ─── DOM References ───────────────────────────────────────────
@@ -42,6 +42,7 @@ const btnPauseMenu = document.getElementById('btn-pause-menu');
 const hud      = document.getElementById('hud');
 const hudScore = document.getElementById('hud-score');
 const hudBest  = document.getElementById('hud-best');
+const hudMode  = document.getElementById('hud-mode');
 
 // ─── Screen Helpers ───────────────────────────────────────────
 
@@ -111,6 +112,19 @@ export function initGame() {
   menuHsValue.textContent = state.highScore;
   showScreen('MENU');
   state.gameState = 'MENU';
+
+  // Mode selector toggle
+  document.querySelectorAll('input[name="game-mode"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('selected'));
+      radio.closest('.mode-card').classList.add('selected');
+
+      // Update high score display for the selected mode
+      const key = radio.value === 'modern' ? HIGH_SCORE_KEY_MODERN : HIGH_SCORE_KEY;
+      const hs = loadHighScore(key);
+      menuHsValue.textContent = hs;
+    });
+  });
 }
 
 /**
@@ -118,12 +132,34 @@ export function initGame() {
  * Resets all mutable state and kicks off the first tick.
  */
 export function startGame() {
-  // Reset snake, direction buffers
-  initSnake();
+  // Đọc mode từ radio button
+  const modeEl = document.querySelector('input[name="game-mode"]:checked');
+  state.gameMode = modeEl?.value?.toUpperCase() === 'MODERN' ? 'MODERN' : 'CLASSIC';
+
+  // CSS accent override
+  document.body.classList.toggle('mode-modern', state.gameMode === 'MODERN');
+  hudMode.textContent = state.gameMode;
+
+  if (state.gameMode === 'MODERN') {
+    // Reset Modern-specific state
+    Object.assign(state, {
+      isStopped: false, stoppedAtWall: null, wallStopFlash: false,
+      obstacles: [], obstacleTimer: 0,
+    });
+  }
+
+  // BUG FIX: Reset snake + food TRƯỚC khi gọi spawnObstacles().
+  // spawnObstacles() → getHeadSafeZone() đọc state.snake[0] và
+  // getOccupiedCells() đọc state.snake / state.food. Từ ván thứ 2 trở đi,
+  // nếu gọi spawnObstacles() trước reset, snake/food ở vị trí cũ →
+  // occupied set sai → obstacle có thể spawn đè lên đầu rắn mới (instant death)
+  // hoặc lọt vào thân rắn.
+  initSnake();       // Reset snake về vị trí ban đầu
+  spawnFood();       // Đặt food mới (dùng vị trí snake mới để tính occupied)
 
   // Reset session state
   state.score       = 0;
-  state.food        = null;
+  state.food        = state.food; // already set by spawnFood()
   state.gameState   = 'PLAYING';
   state.lastTimestamp = null;  // Trigger first-frame guard in game loop
   state.accumulator   = 0;
@@ -131,8 +167,14 @@ export function startGame() {
   // Set initial speed via the formula (even at score 0, for consistency)
   updateSpeed(0);
 
-  // Place food
-  spawnFood();
+  if (state.gameMode === 'MODERN') {
+    // Lúc này snake + food đã ở đúng vị trí mới → safeZone và occupied chính xác
+    spawnObstacles();
+  }
+
+  // Load the correct high score for the selected mode
+  const hsKey = state.gameMode === 'MODERN' ? HIGH_SCORE_KEY_MODERN : HIGH_SCORE_KEY;
+  state.highScore = loadHighScore(hsKey);
 
   // Show HUD, hide all overlays → canvas becomes visible
   showHUD(true);
@@ -165,13 +207,14 @@ export function resumeGame() {
 
 /**
  * Transition to GAME_OVER.
- * Saves high score, updates UI, shows overlay.
+ * Saves high score (per mode), updates UI, shows overlay.
  */
 export function triggerGameOver() {
   state.gameState = 'GAME_OVER';
 
-  const isNewRecord = saveHighScore(state.score);
-  state.highScore   = loadHighScore(); // Re-read to guarantee sync
+  const key = state.gameMode === 'MODERN' ? HIGH_SCORE_KEY_MODERN : HIGH_SCORE_KEY;
+  const isNewRecord = saveHighScore(state.score, key);
+  state.highScore   = loadHighScore(key); // Re-read to guarantee sync
 
   goScore.textContent     = state.score;
   goHighScore.textContent = state.highScore;
@@ -195,7 +238,17 @@ export function resetToMenu() {
   state.gameState         = 'MENU';
   state.lastTimestamp     = null;
   state.accumulator       = 0;
+
+  // Cleanup Modern Mode CSS
+  document.body.classList.remove('mode-modern');
+
+  // Load high score for the currently selected mode in the menu
+  const modeEl = document.querySelector('input[name="game-mode"]:checked');
+  const selectedMode = modeEl?.value?.toUpperCase() === 'MODERN' ? 'MODERN' : 'CLASSIC';
+  const hsKey = selectedMode === 'MODERN' ? HIGH_SCORE_KEY_MODERN : HIGH_SCORE_KEY;
+  state.highScore = loadHighScore(hsKey);
   menuHsValue.textContent = state.highScore;
+
   showHUD(false);
   showScreen('MENU');
 }
@@ -221,38 +274,50 @@ export function setupButtons() {
  * Called by the accumulator loop in main.js whenever
  * enough time has passed (accumulator >= tickInterval).
  *
- * Classic Mode tick flow (research §10):
+ * Classic / Modern Mode tick flow (research §10):
  *   1. Apply buffered direction
- *   2. Compute new head position
- *   3. Wall collision  → Game Over
- *   4. Self-collision  → Game Over
- *   5. Food collision  → Grow + Score + new speed
- *   6. Move snake
+ *   2. (Modern) If stopped → run obstacle timer, skip move
+ *   3. Compute new head position
+ *   4. Wall collision
+ *      - Classic: → Game Over
+ *      - Modern:  → isStopped=true, wallStopFlash=true
+ *   5. Self-collision  → Game Over
+ *   6. (Modern) Obstacle collision → Game Over
+ *   7. Move snake
+ *   8. Food collision  → Grow + Score + new speed
+ *   9. (Modern) Update obstacle relocation timer
  */
 export function update() {
   if (state.gameState !== 'PLAYING') return;
 
   // Step 1 — Apply the buffered next direction.
-  //   currentDirection is the direction BEING executed this tick.
-  //   nextDirection was set (possibly multiple times) since the last tick.
   state.currentDirection = state.nextDirection;
 
-  // Step 2 — Compute where the head will be after this move.
-  const newHead = computeNewHead();
-
-  // Step 3 — Wall collision (Classic Mode: instant Game Over).
-  if (checkWallCollision(newHead)) {
-    triggerGameOver();
+  // Step 2 (Modern only) — Rắn đang dừng → chạy obstacle timer và return
+  if (state.gameMode === 'MODERN' && state.isStopped) {
+    updateObstacles(state.tickInterval);
+    updateHUD();
     return;
   }
 
-  // Step 4 — Self-collision.
-  //   Correct approach: check newHead against the segments that will
-  //   REMAIN after the move.
-  //   - Without food: tail is removed → check [0 .. n-2]
-  //   - With food:    tail stays      → check [0 .. n-1]
-  //   This correctly allows the snake to "chase its own tail" into the
-  //   cell that the tail just vacated.
+  // Step 3 — Compute where the head will be after this move.
+  const newHead = computeNewHead();
+
+  // Step 4 — Wall collision
+  if (state.gameMode === 'CLASSIC') {
+    if (checkWallCollision(newHead)) {
+      triggerGameOver();
+      return;
+    }
+  } else {
+    if (handleModernWallCollision(newHead)) {
+      state.wallStopFlash = true;
+      updateObstacles(state.tickInterval);
+      return;
+    }
+  }
+
+  // Step 5 — Self-collision.
   const atFood   = checkFoodCollision(newHead, state.food);
   const checkEnd = atFood ? state.snake.length : state.snake.length - 1;
 
@@ -261,14 +326,26 @@ export function update() {
     return;
   }
 
-  // Step 5 — Move the snake (grow if food was eaten).
+  // Step 6 (Modern only) — Obstacle collision → Game Over
+  if (state.gameMode === 'MODERN' && checkObstacleCollision(newHead)) {
+    triggerGameOver();
+    return;
+  }
+
+  // Step 7 — Move the snake (grow if food was eaten).
   moveSnake(newHead, atFood);
 
-  // Step 6 — Food eaten: update score, speed, spawn new food.
+  // Step 8 — Food eaten: update score, speed, spawn new food.
   if (atFood) {
     state.score += POINTS_PER_FOOD;
-    updateSpeed(state.score);   // Only called here (and at game start)
-    updateHUD();                // Sync HUD score display
+    updateSpeed(state.score);
     spawnFood();
   }
+
+  // Step 9 (Modern only) — Obstacle relocation timer
+  if (state.gameMode === 'MODERN') {
+    updateObstacles(state.tickInterval);
+  }
+
+  updateHUD();
 }
