@@ -76,10 +76,26 @@ export function handleModernWallCollision(newHead) {
 
 /**
  * Obstacle collision — va chạm chướng ngại vật = Game Over.
+ * Shield active → miễn nhiễm obstacle, return false.
  *
  * @param {{ x: number, y: number }} head
  * @returns {boolean}
  */
 export function checkObstacleCollision(head) {
+  // Shield active → miễn nhiễm obstacle
+  if (state.hasShield) return false;
+
   return state.obstacles.some(obs => obs.x === head.x && obs.y === head.y);
+}
+
+/**
+ * Power-up collision: đầu rắn chạm power-up trên grid?
+ *
+ * @param {{ x: number, y: number }} head
+ * @returns {boolean}
+ */
+export function checkPowerUpCollision(head) {
+  if (!state.activePowerUp) return false;
+  const pos = state.activePowerUp.position;
+  return head.x === pos.x && head.y === pos.y;
 }

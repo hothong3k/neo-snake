@@ -16,6 +16,7 @@
     <!-- ── In-game HUD (outside canvas, above the grid) ────── -->
     <div id="hud" class="hud hidden" aria-live="polite" aria-label="Game HUD">
       <span id="hud-score" class="hud-score">Score&ensp;<strong>0</strong></span>
+      <span id="hud-effects" class="hud-effects" aria-label="Active Effects"></span>
       <span id="hud-mode"  class="hud-mode">CLASSIC</span>
       <span id="hud-best"  class="hud-best">Best&ensp;<strong>0</strong></span>
     </div>
@@ -75,6 +76,27 @@
           </div>
         </div>
 
+        <!-- ── Power-Up Guide (Menu) ──────────────────────── -->
+        <div class="powerup-guide hidden" id="menu-powerup-guide" aria-label="Power-up guide">
+          <div class="powerup-guide__title">
+            Power-Ups <span class="powerup-guide__tag">Modern</span>
+          </div>
+          <ul class="powerup-guide__list">
+            <li class="powerup-guide__item">
+              <span class="pu-badge pu-badge--speed">⚡</span>
+              <span class="pu-desc"><strong>Speed Boost</strong> — +40% speed for 5s</span>
+            </li>
+            <li class="powerup-guide__item">
+              <span class="pu-badge pu-badge--shield">🛡️</span>
+              <span class="pu-desc"><strong>Shield</strong> — immune to obstacles for 8s</span>
+            </li>
+            <li class="powerup-guide__item">
+              <span class="pu-badge pu-badge--shrink">✂️</span>
+              <span class="pu-desc"><strong>Shrink</strong> — cut 3 tail segments instantly</span>
+            </li>
+          </ul>
+        </div>
+
         <div class="menu-hs">
           High Score: <strong id="menu-hs-value">0</strong>
         </div>
@@ -90,6 +112,28 @@
       <div class="card card--sm">
         <h2 class="title-pause">PAUSED</h2>
         <p class="subtitle">Press <kbd>P</kbd> or <kbd>Esc</kbd> to resume</p>
+
+        <!-- ── Power-Up Guide (Pause) ─────────────────────── -->
+        <div class="powerup-guide powerup-guide--compact hidden" id="pause-powerup-guide" aria-label="Power-up guide">
+          <div class="powerup-guide__title">
+            Power-Ups <span class="powerup-guide__tag">Modern</span>
+          </div>
+          <ul class="powerup-guide__list">
+            <li class="powerup-guide__item">
+              <span class="pu-badge pu-badge--speed">⚡</span>
+              <span class="pu-desc"><strong>Speed Boost</strong> — +40% / 5s</span>
+            </li>
+            <li class="powerup-guide__item">
+              <span class="pu-badge pu-badge--shield">🛡️</span>
+              <span class="pu-desc"><strong>Shield</strong> — 8s obstacle immunity</span>
+            </li>
+            <li class="powerup-guide__item">
+              <span class="pu-badge pu-badge--shrink">✂️</span>
+              <span class="pu-desc"><strong>Shrink</strong> — cut 3 segments</span>
+            </li>
+          </ul>
+        </div>
+
         <div class="pause-actions">
           <button id="btn-resume" class="btn-primary">▶&ensp;Resume</button>
           <button id="btn-pause-menu" class="btn-secondary">Back to Menu</button>

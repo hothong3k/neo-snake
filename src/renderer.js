@@ -250,12 +250,145 @@ function drawWallStopFlash() {
   state.wallStopFlash = false; // Reset sau 1 frame
 }
 
+// ─── Modern Mode — Power-Up ───────────────────────────────────
+
+/**
+ * Vẽ power-up đang nằm trên grid.
+ * Mỗi loại có biểu tượng và màu riêng.
+ * Nhấp nháy khi sắp despawn (3 giây cuối).
+ *
+ * @param {number} now — performance.now()
+ */
+function drawPowerUp(now) {
+  if (!state.activePowerUp) return;
+
+  const { type, position, despawnTimer } = state.activePowerUp;
+  const cx = position.x * CELL_SIZE + CELL_SIZE / 2;
+  const cy = position.y * CELL_SIZE + CELL_SIZE / 2;
+
+  // Nhấp nháy khi sắp despawn (3 giây cuối)
+  const isBlinking = despawnTimer <= 3000;
+  const blinkAlpha = isBlinking
+    ? 0.3 + 0.7 * Math.abs(Math.sin(now / 150))
+    : 1;
+
+  // Pulse animation
+  const pulse = Math.sin(now / 400) * 0.5 + 0.5;
+  const radius = CELL_SIZE * (0.35 + 0.05 * pulse);
+
+  // Màu theo loại
+  const colors = {
+    SPEED_BOOST: { fill: '#ffdd00', glow: '#ffaa00', icon: '⚡' },
+    SHIELD:      { fill: '#00bfff', glow: '#0080ff', icon: '🛡️' },
+    SHRINK:      { fill: '#ff69b4', glow: '#ff1493', icon: '✂️' },
+  };
+  const color = colors[type];
+
+  ctx.save();
+  ctx.globalAlpha = blinkAlpha;
+
+  // Outer glow
+  ctx.shadowColor = color.glow;
+  ctx.shadowBlur = 12 + 6 * pulse;
+  ctx.fillStyle = color.fill;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Inner bright core
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = `rgba(255, 255, 255, ${0.4 + 0.2 * pulse})`;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius * 0.45, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Icon text
+  ctx.globalAlpha = blinkAlpha * 0.9;
+  ctx.font = `${CELL_SIZE * 0.55}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(color.icon, cx, cy + 1);
+
+  ctx.restore();
+}
+
+/**
+ * Vẽ trail (vệt sáng) phía sau rắn khi Speed Boost đang active.
+ * Gọi TRƯỚC drawSnakeBody().
+ */
+function drawSpeedTrail() {
+  if (!state.speedBoostActive) return;
+  if (state.snake.length < 2) return;
+
+  // Vẽ 3 đốt "ma" phía sau đuôi
+  const tail = state.snake[state.snake.length - 1];
+  const preTail = state.snake[state.snake.length - 2];
+  const dx = tail.x - preTail.x;
+  const dy = tail.y - preTail.y;
+
+  for (let i = 1; i <= 3; i++) {
+    const alpha = 0.15 - i * 0.04;
+    if (alpha <= 0) break;
+    ctx.save();
+    ctx.fillStyle = `rgba(255, 221, 0, ${alpha})`;
+    fillRoundRect(
+      (tail.x + dx * i) * CELL_SIZE + 3,
+      (tail.y + dy * i) * CELL_SIZE + 3,
+      CELL_SIZE - 6, CELL_SIZE - 6, 3
+    );
+    ctx.restore();
+  }
+}
+
+/**
+ * Vẽ viền Shield phát sáng xung quanh toàn bộ rắn khi hasShield === true.
+ * Gọi SAU drawSnakeBody(), TRƯỚC drawSnakeHead().
+ *
+ * @param {number} now — performance.now()
+ */
+function drawShieldGlow(now) {
+  if (!state.hasShield) return;
+
+  const pulse = Math.sin(now / 300) * 0.3 + 0.7;
+
+  state.snake.forEach(seg => {
+    ctx.save();
+    ctx.strokeStyle = `rgba(0, 191, 255, ${0.35 * pulse})`;
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = '#00bfff';
+    ctx.shadowBlur = 10 * pulse;
+    ctx.beginPath();
+    if (ctx.roundRect) {
+      ctx.roundRect(
+        seg.x * CELL_SIZE, seg.y * CELL_SIZE,
+        CELL_SIZE, CELL_SIZE, 5
+      );
+    } else {
+      ctx.rect(seg.x * CELL_SIZE, seg.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+    }
+    ctx.stroke();
+    ctx.restore();
+  });
+}
+
 
 // ─── Public API ───────────────────────────────────────────────
 
 /**
  * Main render function — called every animation frame from main.js.
  * Draws the complete frame for the current game state.
+ *
+ * Render order (back → front):
+ *   1. Background
+ *   2. Grid lines
+ *   3. Obstacles (Modern only)
+ *   4. Food
+ *   5. Power-up on grid (Modern only)
+ *   6. Speed trail (Modern only)
+ *   7. Snake body
+ *   8. Shield glow (Modern only)
+ *   9. Snake head + eyes
+ *   10. Wall-stop flash overlay (Modern only)
  *
  * @param {number} now - performance.now() timestamp for animations.
  */
@@ -275,7 +408,11 @@ export function render(now) {
   drawGrid();
   if (state.gameMode === 'MODERN') drawObstacles(now);
   drawFood(now);
+  if (state.gameMode === 'MODERN') drawPowerUp(now);
+  if (state.gameMode === 'MODERN') drawSpeedTrail();
   drawSnakeBody();
+  if (state.gameMode === 'MODERN') drawShieldGlow(now);
   drawSnakeHead();
   if (state.gameMode === 'MODERN') drawWallStopFlash();
 }
+

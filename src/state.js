@@ -89,4 +89,54 @@ export const state = {
 
   /** Bộ đếm thời gian tái sinh obstacle (ms). */
   obstacleTimer: 0,
+
+  /**
+   * Số lần obstacle đã tái sinh.
+   * Sau OBSTACLE_GROW_AFTER_RELOCATIONS lần, mỗi lần tái sinh
+   * sẽ tăng thêm 1 obstacle (tối đa MAX_OBSTACLE_COUNT).
+   */
+  obstacleRelocationCount: 0,
+
+  // ── Modern Mode — Instant Effect Toast ───────────────────────
+  /**
+   * Toast ngắn hạn cho hiệu ứng instant (SHRINK).
+   * { type: 'SHRINK', remainingMs: number } | null
+   * Hiển thị trên HUD để người chơi biết đã nhặt được vật phẩm.
+   */
+  instantToast: null,
+
+  // ── Modern Mode — Power-Ups ─────────────────────────────────
+
+  /**
+   * Power-up hiện đang nằm trên grid (chưa nhặt).
+   * null nếu không có power-up nào trên grid.
+   * { type: 'SPEED_BOOST'|'SHIELD'|'SHRINK', position: {x,y}, despawnTimer: number }
+   */
+  activePowerUp: null,
+
+  /**
+   * Bộ đếm thời gian spawn power-up mới (ms, tick-based).
+   * Reset về 0 mỗi khi spawn hoặc despawn.
+   */
+  powerUpSpawnTimer: 0,
+
+  /**
+   * Mảng hiệu ứng đang tác dụng lên rắn.
+   * Mỗi phần tử: { type: string, remainingMs: number }
+   * Shrink là instant effect → không vào mảng này.
+   */
+  activeEffects: [],
+
+  /**
+   * true khi rắn đang có Speed Boost active.
+   * Dùng để guard updateSpeed() không ghi đè tickInterval.
+   * Ref: game-algorithms-research.md § 6 — double-collection bug
+   */
+  speedBoostActive: false,
+
+  /**
+   * true khi rắn đang có Shield.
+   * Dùng bởi checkObstacleCollision() để skip collision.
+   */
+  hasShield: false,
 };

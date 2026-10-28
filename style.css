@@ -65,14 +65,21 @@ html, body {
   justify-content: space-between;
   width: 100%;            /* stretches to game-wrapper width via JS or max-width */
   max-width: calc(30 * 20px); /* GRID_COLS * CELL_SIZE = 600px */
-  padding: 6px 12px;
-  background: rgba(5, 5, 8, 0.72);
-  border: 1px solid rgba(57, 255, 20, 0.12);
+  min-height: 40px;
+  padding: 6px 14px;
+  background: rgba(5, 5, 8, 0.85);
+  border: 1px solid rgba(57, 255, 20, 0.16);
   border-bottom: none;
   border-radius: 10px 10px 0 0;
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.3px;
+  box-sizing: border-box;
+}
+
+body.mode-modern .hud {
+  border-color: rgba(0, 229, 255, 0.25);
+  box-shadow: 0 -2px 14px rgba(0, 229, 255, 0.08);
 }
 
 .hud.hidden {
@@ -92,6 +99,11 @@ html, body {
   font-weight: 700;
   letter-spacing: 2px;
   color: rgba(57, 255, 20, 0.55);
+}
+
+body.mode-modern .hud-mode {
+  color: #00e5ff;
+  text-shadow: 0 0 8px rgba(0, 229, 255, 0.5);
 }
 
 .hud-best {
@@ -154,6 +166,8 @@ html, body {
     0 0 48px rgba(57, 255, 20, 0.04),
     inset 0 1px 0 rgba(255, 255, 255, 0.07);
   animation: card-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
 .card--sm {
@@ -489,7 +503,159 @@ kbd {
   gap: 8px;
 }
 
+/* ── Power-Up Guide (Menu & Pause) ──────────────────────── */
+.powerup-guide {
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 18px;
+  text-align: left;
+}
+
+.powerup-guide--compact {
+  padding: 10px 14px;
+  margin-bottom: 16px;
+}
+
+.powerup-guide__title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+
+.powerup-guide__tag {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  color: rgba(0, 229, 255, 0.75);
+  background: rgba(0, 229, 255, 0.10);
+  border: 1px solid rgba(0, 229, 255, 0.28);
+  border-radius: 20px;
+  padding: 1px 8px;
+}
+
+.powerup-guide__list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.powerup-guide__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+
+.pu-desc strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.pu-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.pu-badge--speed {
+  background: rgba(255, 221, 0, 0.15);
+  border: 1px solid rgba(255, 221, 0, 0.45);
+  box-shadow: 0 0 6px rgba(255, 221, 0, 0.25);
+}
+
+.pu-badge--shield {
+  background: rgba(0, 191, 255, 0.15);
+  border: 1px solid rgba(0, 191, 255, 0.45);
+  box-shadow: 0 0 6px rgba(0, 191, 255, 0.25);
+}
+
+.pu-badge--shrink {
+  background: rgba(255, 105, 180, 0.15);
+  border: 1px solid rgba(255, 105, 180, 0.45);
+  box-shadow: 0 0 6px rgba(255, 105, 180, 0.25);
+}
+
+.powerup-guide.hidden {
+  display: none !important;
+}
+
 /* ─── Scrollbar ─────────────────────────────────────────── */
 ::-webkit-scrollbar         { width: 4px; }
 ::-webkit-scrollbar-track   { background: transparent; }
 ::-webkit-scrollbar-thumb   { background: var(--border); border-radius: 2px; }
+
+/* ── HUD — Effect Indicators ────────────────────────────── */
+.hud-effects {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  margin: 0 10px;
+  min-height: 28px;
+}
+
+.effect-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.68rem;
+  border-radius: 20px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  animation: effect-pill-in 0.25s ease-out;
+}
+
+.effect-pill--speed {
+  background: rgba(255, 210, 0, 0.30);
+  color: #fff266;
+  border: 1.5px solid #ffdd00;
+  box-shadow:
+    0 0 12px rgba(255, 221, 0, 0.55),
+    inset 0 0 6px rgba(255, 221, 0, 0.20);
+  text-shadow: 0 0 6px rgba(255, 221, 0, 0.85);
+}
+
+.effect-pill--shield {
+  background: rgba(0, 191, 255, 0.30);
+  color: #7de7ff;
+  border: 1.5px solid #00d4ff;
+  box-shadow:
+    0 0 12px rgba(0, 191, 255, 0.55),
+    inset 0 0 6px rgba(0, 191, 255, 0.20);
+  text-shadow: 0 0 6px rgba(0, 191, 255, 0.85);
+}
+
+.effect-pill--shrink {
+  background: rgba(255, 105, 180, 0.30);
+  color: #ffa6d5;
+  border: 1.5px solid #ff69b4;
+  box-shadow:
+    0 0 12px rgba(255, 105, 180, 0.55),
+    inset 0 0 6px rgba(255, 105, 180, 0.20);
+  text-shadow: 0 0 6px rgba(255, 105, 180, 0.85);
+}
+
+@keyframes effect-pill-in {
+  from { transform: scale(0.85); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+

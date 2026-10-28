@@ -13,6 +13,8 @@ import {
   GRID_COLS, GRID_ROWS,
   OBSTACLE_COUNT, OBSTACLE_RELOCATE_INTERVAL,
   OBSTACLE_HEAD_SAFE_RADIUS,
+  MAX_OBSTACLE_COUNT, OBSTACLE_GROW_AFTER_RELOCATIONS,
+  POWERUP_SPAWN_INTERVAL, POWERUP_DESPAWN_DURATION,
 } from './config.js';
 
 /**
@@ -25,6 +27,9 @@ export function getOccupiedCells() {
   const cells = new Set(state.snake.map(s => `${s.x},${s.y}`));
   if (state.food) cells.add(`${state.food.x},${state.food.y}`);
   state.obstacles.forEach(o => cells.add(`${o.x},${o.y}`));
+  if (state.activePowerUp) {
+    cells.add(`${state.activePowerUp.position.x},${state.activePowerUp.position.y}`);
+  }
   return cells;
 }
 
@@ -38,6 +43,9 @@ export function getOccupiedCells() {
 export function getOccupiedCellsWithoutObstacles() {
   const cells = new Set(state.snake.map(s => `${s.x},${s.y}`));
   if (state.food) cells.add(`${state.food.x},${state.food.y}`);
+  if (state.activePowerUp) {
+    cells.add(`${state.activePowerUp.position.x},${state.activePowerUp.position.y}`);
+  }
   return cells;
 }
 
@@ -117,31 +125,91 @@ export function spawnObstacles() {
 }
 
 /**
+ * Tính số obstacle mong muốn dựa trên số lần tái sinh.
+ * - Trước & trong OBSTACLE_GROW_AFTER_RELOCATIONS lần đầu:
+ *   giữ nguyên OBSTACLE_COUNT.
+ * - Từ lần kế tiếp trở đi: +1 mỗi lần, cap ở MAX_OBSTACLE_COUNT.
+ *
+ * @param {number} relocationCount
+ * @returns {number}
+ */
+function computeDesiredObstacleCount(relocationCount) {
+  if (relocationCount <= OBSTACLE_GROW_AFTER_RELOCATIONS) {
+    return OBSTACLE_COUNT;
+  }
+  const growth = relocationCount - OBSTACLE_GROW_AFTER_RELOCATIONS;
+  return Math.min(MAX_OBSTACLE_COUNT, OBSTACLE_COUNT + growth);
+}
+
+/**
  * Cập nhật bộ đếm tái sinh obstacle.
  * Gọi trong update() với tickInterval.
  * Ref: game-algorithms-research.md § 5 — tick-based timer
  */
 export function updateObstacles(tickInterval) {
   state.obstacleTimer += tickInterval;
-  if (state.obstacleTimer >= OBSTACLE_RELOCATE_INTERVAL) {
-    state.obstacleTimer = 0;
-    const safeZone = getHeadSafeZone();
+  if (state.obstacleTimer < OBSTACLE_RELOCATE_INTERVAL) return;
 
-    // BUG FIX: Không dùng Array.map — trong suốt quá trình map,
-    // getOccupiedCells() vẫn thấy mảng obstacle CŨ nên 2 obstacle mới
-    // có thể cùng spawn vào một ô.
-    // Fix: Dùng vòng lặp ghi trực tiếp với một occupied Set tích lũy,
-    // mỗi vị trí mới được đánh dấu ngay trước khi sinh obstacle tiếp theo.
-    const newObstacles = [];
-    // Bắt đầu từ occupied không có obstacle cũ (chúng đang được tái sinh).
-    const occupied = getOccupiedCellsWithoutObstacles();
-    for (let i = 0; i < state.obstacles.length; i++) {
-      const pos = safeSpawn(occupied, safeZone);
-      if (pos) {
-        newObstacles.push(pos);
-        occupied.add(`${pos.x},${pos.y}`); // Đánh dấu ngay để obstacle tiếp không trùng
-      }
+  state.obstacleTimer = 0;
+  state.obstacleRelocationCount += 1;
+
+  const desiredCount = computeDesiredObstacleCount(state.obstacleRelocationCount);
+  const safeZone = getHeadSafeZone();
+
+  // Tái sinh toàn bộ — dùng occupied set tích lũy để tránh trùng ô.
+  const newObstacles = [];
+  const occupied = getOccupiedCellsWithoutObstacles();
+  for (let i = 0; i < desiredCount; i++) {
+    const pos = safeSpawn(occupied, safeZone);
+    if (!pos) break; // Grid gần đầy — dừng sớm
+    newObstacles.push(pos);
+    occupied.add(`${pos.x},${pos.y}`);
+  }
+  state.obstacles = newObstacles;
+}
+
+/** Danh sách loại power-up, chọn ngẫu nhiên. */
+const POWERUP_TYPES = ['SPEED_BOOST', 'SHIELD', 'SHRINK'];
+
+/**
+ * Spawn một power-up ngẫu nhiên lên grid.
+ * Chỉ spawn nếu chưa có power-up nào trên grid.
+ */
+export function spawnRandomPowerUp() {
+  if (state.activePowerUp) return; // Chỉ 1 power-up cùng lúc
+
+  const occupied = getOccupiedCells();
+  const position = safeSpawn(occupied);
+  if (!position) return; // Grid đầy
+
+  const type = POWERUP_TYPES[Math.floor(Math.random() * POWERUP_TYPES.length)];
+  state.activePowerUp = {
+    type,
+    position,
+    despawnTimer: POWERUP_DESPAWN_DURATION,
+  };
+}
+
+/**
+ * Quản lý spawn/despawn timer cho power-up.
+ * Gọi trong update() với tickInterval (tick-based, KHÔNG phải deltaTime).
+ *
+ * Ref: game-algorithms-research.md § 5 — Power-Up Spawning
+ */
+export function updatePowerUpTimers(tickInterval) {
+  if (!state.activePowerUp) {
+    // Không có power-up trên grid → đếm thời gian để spawn
+    state.powerUpSpawnTimer += tickInterval;
+    if (state.powerUpSpawnTimer >= POWERUP_SPAWN_INTERVAL) {
+      state.powerUpSpawnTimer = 0;
+      spawnRandomPowerUp();
     }
-    state.obstacles = newObstacles;
+  } else {
+    // Có power-up trên grid → đếm thời gian despawn
+    state.activePowerUp.despawnTimer -= tickInterval;
+    if (state.activePowerUp.despawnTimer <= 0) {
+      state.activePowerUp = null; // Biến mất nếu không nhặt kịp
+      state.powerUpSpawnTimer = 0; // Reset spawn timer
+    }
   }
 }

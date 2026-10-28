@@ -13,14 +13,15 @@
 
 import { state } from './state.js';
 import {
-  GRID_COLS, GRID_ROWS,
-  BASE_TICK_INTERVAL, MIN_TICK_INTERVAL,
   POINTS_PER_FOOD, HIGH_SCORE_KEY_MODERN, HIGH_SCORE_KEY,
 } from './config.js';
 import { initSnake, computeNewHead, moveSnake } from './snake.js';
-import { spawnFood, spawnObstacles, updateObstacles } from './spawner.js';
-import { checkWallCollision, checkSelfCollision, checkFoodCollision, handleModernWallCollision, checkObstacleCollision } from './collision.js';
+import { spawnFood, spawnObstacles, updateObstacles, updatePowerUpTimers } from './spawner.js';
+import { checkWallCollision, checkSelfCollision, checkFoodCollision, handleModernWallCollision,
+         checkObstacleCollision, checkPowerUpCollision } from './collision.js';
 import { loadHighScore, saveHighScore } from './storage.js';
+import { applyEffect, updateEffects } from './effects.js';
+import { updateSpeed } from './speed.js';
 
 // ─── DOM References ───────────────────────────────────────────
 const screenMenu    = document.getElementById('screen-menu');
@@ -38,11 +39,15 @@ const btnMenu      = document.getElementById('btn-menu');
 const btnResume    = document.getElementById('btn-resume');
 const btnPauseMenu = document.getElementById('btn-pause-menu');
 
+const menuPowerUpGuide  = document.getElementById('menu-powerup-guide');
+const pausePowerUpGuide = document.getElementById('pause-powerup-guide');
+
 // ─── HUD DOM References ────────────────────────────────
-const hud      = document.getElementById('hud');
-const hudScore = document.getElementById('hud-score');
-const hudBest  = document.getElementById('hud-best');
-const hudMode  = document.getElementById('hud-mode');
+const hud        = document.getElementById('hud');
+const hudScore   = document.getElementById('hud-score');
+const hudBest    = document.getElementById('hud-best');
+const hudMode    = document.getElementById('hud-mode');
+const hudEffects = document.getElementById('hud-effects');
 
 // ─── Screen Helpers ───────────────────────────────────────────
 
@@ -67,41 +72,89 @@ function showHUD(visible) {
   }
 }
 
-/** Sync HUD score and best score displays. */
+/** Sync HUD score, best score, and active effect indicators. */
 function updateHUD() {
   hudScore.innerHTML = `Score&ensp;<strong>${state.score}</strong>`;
   hudBest.innerHTML  = `Best&ensp;<strong>${state.highScore}</strong>`;
+
+  if (hudEffects) {
+    if (state.gameMode === 'MODERN') {
+      const pills = [];
+
+      // Instant toast (SHRINK) — hiển thị rõ ràng
+      if (state.instantToast && state.instantToast.type === 'SHRINK') {
+        pills.push({
+          type: 'SHRINK',
+          className: 'effect-pill--shrink',
+          icon: '✂️',
+          text: 'SHRINK −3',
+        });
+      }
+
+      // Timed effects
+      state.activeEffects.forEach(e => {
+        const secs = Math.ceil(e.remainingMs / 1000);
+        if (e.type === 'SPEED_BOOST') {
+          pills.push({
+            type: 'SPEED_BOOST',
+            className: 'effect-pill--speed',
+            icon: '⚡',
+            text: `SPEED BOOST ${secs}s`,
+          });
+        } else if (e.type === 'SHIELD') {
+          pills.push({
+            type: 'SHIELD',
+            className: 'effect-pill--shield',
+            icon: '🛡️',
+            text: `SHIELD ${secs}s`,
+          });
+        }
+      });
+
+      // Synchronize DOM elements to prevent animation flicker on every tick
+      const existingPills = Array.from(hudEffects.querySelectorAll('.effect-pill'));
+      const existingTypes = existingPills.map(p => p.dataset.type).join(',');
+      const newTypes = pills.map(p => p.type).join(',');
+
+      if (existingTypes !== newTypes) {
+        // Types changed (added or removed) -> render new pill elements
+        hudEffects.innerHTML = pills.map(p =>
+          `<span class="effect-pill ${p.className}" data-type="${p.type}">` +
+          `<span class="pill-icon">${p.icon}</span> <span class="pill-text">${p.text}</span>` +
+          `</span>`
+        ).join('');
+      } else {
+        // Same types present -> only update text content without resetting animation
+        pills.forEach((p, i) => {
+          const textEl = existingPills[i]?.querySelector('.pill-text');
+          if (textEl && textEl.textContent !== p.text) {
+            textEl.textContent = p.text;
+          }
+        });
+      }
+    } else {
+      if (hudEffects.innerHTML !== '') {
+        hudEffects.innerHTML = '';
+      }
+    }
+  }
 }
 
-// ─── Speed (Progressive Difficulty) ──────────────────────────
-
-/**
- * Recalculate tick interval based on current score.
- * Uses a logarithmic curve so early-game acceleration is fast
- * while high-score progression is more gradual.
- *
- * Called ONLY on food-eat events and once at game start.
- * NEVER called inside the tick loop (would overwrite Speed Boost).
- *
- * Formula: interval = max(MIN, 200 - 20·log₂(score + 1))
- *   score=0   → 200 ms  (base speed)
- *   score=100 → ≈ 153 ms
- *   score=500 → ≈ 113 ms
- *   score=∞   → 60 ms   (floor)
- *
- * Reference: game-algorithms-research.md § 7
- *
- * @param {number} score
- */
-export function updateSpeed(score) {
-  state.baseTickInterval = Math.max(
-    MIN_TICK_INTERVAL,
-    200 - 20 * Math.log2(score + 1)
-  );
-  state.tickInterval = state.baseTickInterval;
-}
+// updateSpeed has been moved to src/speed.js to break circular dependency
+// with effects.js. It is imported above and re-exported here for backward
+// compatibility with any external consumers.
+export { updateSpeed };
 
 // ─── State Transitions ────────────────────────────────────────
+
+/** Cập nhật ẩn/hiện bảng power-up guide tại Menu theo chế độ đang chọn */
+function updateMenuPowerUpGuide() {
+  const modeEl = document.querySelector('input[name="game-mode"]:checked');
+  const isModern = modeEl?.value?.toUpperCase() === 'MODERN';
+  if (menuPowerUpGuide) {
+    menuPowerUpGuide.classList.toggle('hidden', !isModern);
+  }
+}
 
 /**
  * One-time initialisation called from main.js.
@@ -123,8 +176,12 @@ export function initGame() {
       const key = radio.value === 'modern' ? HIGH_SCORE_KEY_MODERN : HIGH_SCORE_KEY;
       const hs = loadHighScore(key);
       menuHsValue.textContent = hs;
+
+      updateMenuPowerUpGuide();
     });
   });
+
+  updateMenuPowerUpGuide();
 }
 
 /**
@@ -141,10 +198,13 @@ export function startGame() {
   hudMode.textContent = state.gameMode;
 
   if (state.gameMode === 'MODERN') {
-    // Reset Modern-specific state
     Object.assign(state, {
       isStopped: false, stoppedAtWall: null, wallStopFlash: false,
       obstacles: [], obstacleTimer: 0,
+      obstacleRelocationCount: 0,        // ← THÊM
+      activePowerUp: null, powerUpSpawnTimer: 0,
+      activeEffects: [], speedBoostActive: false, hasShield: false,
+      instantToast: null,                // ← THÊM
     });
   }
 
@@ -190,6 +250,11 @@ export function pauseGame() {
   if (state.gameState !== 'PLAYING') return;
   state.gameState   = 'PAUSED';
   state.accumulator = 0;
+
+  if (pausePowerUpGuide) {
+    pausePowerUpGuide.classList.toggle('hidden', state.gameMode !== 'MODERN');
+  }
+
   showScreen('PAUSE');
 }
 
@@ -250,6 +315,7 @@ export function resetToMenu() {
   menuHsValue.textContent = state.highScore;
 
   showHUD(false);
+  updateMenuPowerUpGuide();
   showScreen('MENU');
 }
 
@@ -293,9 +359,11 @@ export function update() {
   // Step 1 — Apply the buffered next direction.
   state.currentDirection = state.nextDirection;
 
-  // Step 2 (Modern only) — Rắn đang dừng → chạy obstacle timer và return
+  // Step 2 (Modern only) — Rắn đang dừng → chạy timers và return
   if (state.gameMode === 'MODERN' && state.isStopped) {
     updateObstacles(state.tickInterval);
+    updatePowerUpTimers(state.tickInterval);    // ← MỚI
+    updateEffects(state.tickInterval);          // ← MỚI
     updateHUD();
     return;
   }
@@ -313,6 +381,9 @@ export function update() {
     if (handleModernWallCollision(newHead)) {
       state.wallStopFlash = true;
       updateObstacles(state.tickInterval);
+      updatePowerUpTimers(state.tickInterval);  // ← MỚI
+      updateEffects(state.tickInterval);        // ← MỚI
+      updateHUD();
       return;
     }
   }
@@ -327,6 +398,7 @@ export function update() {
   }
 
   // Step 6 (Modern only) — Obstacle collision → Game Over
+  //   (checkObstacleCollision bây giờ tự skip nếu hasShield)
   if (state.gameMode === 'MODERN' && checkObstacleCollision(newHead)) {
     triggerGameOver();
     return;
@@ -342,9 +414,26 @@ export function update() {
     spawnFood();
   }
 
+  // Step 8b (Modern only) — Power-up collision ← MỚI
+  if (state.gameMode === 'MODERN' && checkPowerUpCollision(newHead)) {
+    applyEffect(state.activePowerUp.type);
+    state.activePowerUp = null; // Xóa khỏi grid
+    state.powerUpSpawnTimer = 0; // Reset spawn timer
+  }
+
   // Step 9 (Modern only) — Obstacle relocation timer
   if (state.gameMode === 'MODERN') {
     updateObstacles(state.tickInterval);
+  }
+
+  // Step 10 (Modern only) — Power-up spawn/despawn timer ← MỚI
+  if (state.gameMode === 'MODERN') {
+    updatePowerUpTimers(state.tickInterval);
+  }
+
+  // Step 11 (Modern only) — Effect timers ← MỚI
+  if (state.gameMode === 'MODERN') {
+    updateEffects(state.tickInterval);
   }
 
   updateHUD();
